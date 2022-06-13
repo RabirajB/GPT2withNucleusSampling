@@ -66,6 +66,7 @@ def text_generator(state_dict):
             temperature=args.temperature, top_k=args.top_k, device=device
         )
         out = out[:, len(context_tokens):].tolist()
+        #print(out.size())
         for i in range(args.batch_size):
             generated += 1
             text = enc.decode(out[i])

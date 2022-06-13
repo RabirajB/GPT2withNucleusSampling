@@ -2,12 +2,18 @@
     code by TaeHwan Jung(@graykode)
     Original Paper and repository here : https://github.com/openai/gpt-2
     GPT2 Pytorch Model : https://github.com/huggingface/pytorch-pretrained-BERT
+
+    Modfication by Rabiraj Bandyopadhyay (RabirajB)
+    1) Changed the reshape calculation in the Attention class
+    2)Changed the Loss calculation which will now shift the logits by one place
 '''
 import copy
 import torch
 import math
 import torch.nn as nn
 from torch.nn.parameter import Parameter
+from einops.layers.torch import Rearrange, Reduce
+
 
 def gelu(x):
     return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
@@ -71,8 +77,10 @@ class Attention(nn.Module):
         return x.view(*new_x_shape)  # in Tensorflow implem: fct merge_states
 
     def split_heads(self, x, k=False):
-        new_x_shape = x.size()[:-1] + (self.n_head, x.size(-1) // self.n_head)
-        x = x.view(*new_x_shape)  # in Tensorflow implem: fct split_states
+        
+        #new_x_shape = x.size()[:-1] + (self.n_head, x.size(-1) // self.n_head)
+        x = x.contiguous().view(x.size(0), x.size(-2), self.n_head, x.size(-1) // self.n_head)
+        #x = x.view(*new_x_shape)  # in Tensorflow implem: fct split_states
         if k:
             return x.permute(0, 2, 3, 1)  # (batch, head, head_features, seq_length)
         else:
@@ -80,10 +88,12 @@ class Attention(nn.Module):
 
     def forward(self, x, layer_past=None):
         x = self.c_attn(x)
+        #print('Size after Conv1d c_attn', x.size())
         query, key, value = x.split(self.split_size, dim=2)
         query = self.split_heads(query)
         key = self.split_heads(key, k=True)
         value = self.split_heads(value)
+        #print(layer_past)
         if layer_past is not None:
             past_key, past_value = layer_past[0].transpose(-2, -1), layer_past[1]  # transpose back cf below
             key = torch.cat((past_key, key), dim=-1)
@@ -131,7 +141,7 @@ class GPT2Model(nn.Module):
         self.n_vocab = config.vocab_size
 
         self.wte = nn.Embedding(config.vocab_size, config.n_embd)
-        self.wpe = nn.Embedding(config.n_positions, config.n_embd)
+        self.wpe = nn.Embedding(config.n_positions, config.n_embd) # For positional Encoding
         block = Block(config.n_ctx, config, scale=True)
         self.h = nn.ModuleList([copy.deepcopy(block) for _ in range(config.n_layer)])
         self.ln_f = LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
@@ -142,6 +152,7 @@ class GPT2Model(nn.Module):
         self.decoder.weight = model_embeddings_weights  # Tied weights
 
     def forward(self, input_ids, position_ids=None, token_type_ids=None, past=None):
+        #print(past)
         if past is None:
             past_length = 0
             past = [None] * len(self.h)
@@ -166,6 +177,7 @@ class GPT2Model(nn.Module):
         hidden_states = inputs_embeds + position_embeds + token_type_embeds
         presents = []
         for block, layer_past in zip(self.h, past):
+            #print("Layer Past",layer_past)
             hidden_states, present = block(hidden_states, layer_past)
             presents.append(present)
         hidden_states = self.ln_f(hidden_states)
@@ -180,6 +192,7 @@ class GPT2LMHead(nn.Module):
 
     def set_embeddings_weights(self, model_embeddings_weights):
         embed_shape = model_embeddings_weights.shape
+        #print(embed_shape)
         self.decoder = nn.Linear(embed_shape[1], embed_shape[0], bias=False)
         self.decoder.weight = model_embeddings_weights  # Tied weights
 
@@ -203,8 +216,10 @@ class GPT2LMHeadModel(nn.Module):
     def forward(self, input_ids, position_ids=None, token_type_ids=None, lm_labels=None, past=None):
         hidden_states, presents = self.transformer(input_ids, position_ids, token_type_ids, past)
         lm_logits = self.lm_head(hidden_states)
+        shift_logits = lm_logits[..., :-1, :]
         if lm_labels is not None:
+            shift_labels = lm_labels[..., 1:]
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
-            loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), lm_labels.view(-1))
+            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             return loss
         return lm_logits, presents
