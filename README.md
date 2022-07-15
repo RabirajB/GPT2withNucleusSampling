@@ -1,4 +1,5 @@
 ## **GPT2-Pytorch with Text-Generator**
+** This code has been modified by me(Rabiraj) and I have added the nucleus sampling technique inspired by the paper Holtzman et.al "The Curious Case of Neural Text Degeneration"(paper link : https://arxiv.org/pdf/1904.09751.pdf), the code link for the same is https://github.com/ari-holtzman/degen
 
 <p align="center"><img width="100" src="https://media-thumbs.golden.com/OLqzmrmwAzY1P7Sl29k2T9WjJdM=/200x200/smart/golden-storage-production.s3.amazonaws.com/topic_images/e08914afa10a4179893eeb07cb5e4713.png" /></p>
 
@@ -76,7 +77,9 @@ $ pip install -r requirements.txt
 
 - Tae Hwan Jung(Jeff Jung) @graykode
 - Author Email : [nlkey2022@gmail.com](mailto:nlkey2022@gmail.com)
-
+- Code Changes and Nucleus Sampling added by
+- Rabiraj Bandyopadhyay
+- email : [rabiraj2010@gmail.com]
 
 
 ## License
