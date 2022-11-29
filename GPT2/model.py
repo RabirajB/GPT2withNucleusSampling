@@ -55,6 +55,7 @@ class Attention(nn.Module):
         # [switch nx => n_state from Block to Attention to keep identical to TF implem]
         assert n_state % config.n_head == 0
         self.register_buffer("bias", torch.tril(torch.ones(n_ctx, n_ctx)).view(1, 1, n_ctx, n_ctx))
+        self.register_buffer("masked_bias", torch.tensor(-1e4))
         self.n_head = config.n_head
         self.split_size = n_state
         self.scale = scale
@@ -63,11 +64,21 @@ class Attention(nn.Module):
 
     def _attn(self, q, k, v):
         w = torch.matmul(q, k)
+        print("Query Shape", q.size())
+        print("Key Shape", k.size())
+        print("Value Shape", v.size())
         if self.scale:
-            w = w / math.sqrt(v.size(-1))
-        nd, ns = w.size(-2), w.size(-1)
-        b = self.bias[:, :, ns-nd:ns, :ns]
-        w = w * b - 1e10 * (1 - b)
+            w = w/ math.sqrt(v.size(-1))
+        nd, ns = q.size(-2), k.size(-1)
+        #print("ns", ns)
+        #print("nd", nd)
+        c_m = self.bias[:, :, ns-nd:ns, :ns].bool()
+        #print("b shape", b.size())
+        '''
+            >> torch.where will take the conditional tensor and will set the value 
+            >> of the slice to masked_bias value wherever it is false
+        '''
+        w = torch.where(c_m, w, self.masked_bias.to(w.dtype))
         w = nn.Softmax(dim=-1)(w)
         return torch.matmul(w, v)
 
@@ -216,7 +227,7 @@ class GPT2LMHeadModel(nn.Module):
     def forward(self, input_ids, position_ids=None, token_type_ids=None, lm_labels=None, past=None):
         hidden_states, presents = self.transformer(input_ids, position_ids, token_type_ids, past)
         lm_logits = self.lm_head(hidden_states)
-        shift_logits = lm_logits[..., :-1, :]
+        shift_logits = lm_logits[..., :-1, :] # We are essentially doing the language modeling objective as mentioned in Bengio et.al's paper NeurlIPS 2003
         if lm_labels is not None:
             shift_labels = lm_labels[..., 1:]
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)

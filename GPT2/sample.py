@@ -28,7 +28,8 @@ def top_p_logits(logits, top_p, filter_value = -float('Inf')):
     sorted_indices_to_remove = cumulative_probs > top_p
     sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
     sorted_indices_to_remove[..., 0] = 0
-    indices_to_remove = sorted_indices_to_remove.scatter(dim=1, index=sorted_indices, src=sorted_indices_to_remove) # Need to research this
+    # Essentially it is inserting the values based on the sorted indices which acts as the index
+    indices_to_remove = sorted_indices_to_remove.scatter(dim=1, index=sorted_indices, src=sorted_indices_to_remove)
     logits[indices_to_remove] = filter_value
     return logits
 

@@ -55,6 +55,7 @@ def text_generator(state_dict):
 
     print(args.text)
     context_tokens = enc.encode(args.text)
+    #print(len(context_tokens))
 
     generated = 0
     for _ in range(args.nsamples // args.batch_size):
