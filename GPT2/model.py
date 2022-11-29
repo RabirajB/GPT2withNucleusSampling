@@ -6,6 +6,7 @@
     Modfication by Rabiraj Bandyopadhyay (RabirajB)
     1) Changed the reshape calculation in the Attention class
     2)Changed the Loss calculation which will now shift the logits by one place
+    3) Changed the attention calculation by adding the causal mask concept using torch.where
 '''
 import copy
 import torch
