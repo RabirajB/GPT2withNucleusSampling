@@ -65,16 +65,10 @@ class Attention(nn.Module):
 
     def _attn(self, q, k, v):
         w = torch.matmul(q, k)
-        print("Query Shape", q.size())
-        print("Key Shape", k.size())
-        print("Value Shape", v.size())
         if self.scale:
             w = w/ math.sqrt(v.size(-1))
         nd, ns = q.size(-2), k.size(-1)
-        #print("ns", ns)
-        #print("nd", nd)
         c_m = self.bias[:, :, ns-nd:ns, :ns].bool()
-        #print("b shape", b.size())
         '''
             >> torch.where will take the conditional tensor and will set the value 
             >> of the slice to masked_bias value wherever it is false
